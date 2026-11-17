@@ -1,6 +1,9 @@
 import asyncio
+import logging
 from ddgs import DDGS
 from .search_cache import SearchCache
+
+logger = logging.getLogger(__name__)
 
 
 class DuckDuckGoSearch:
@@ -16,10 +19,16 @@ class DuckDuckGoSearch:
         def run():
             return [{"title": x.get("title", ""), "url": x.get("href", ""), "content": x.get("body", "")} for x in DDGS().text(query, max_results=max_results)]
 
-        try:
-            results = await asyncio.wait_for(asyncio.to_thread(run), timeout=20)
-        except Exception:
-            results = []
+        results = []
+        for attempt in range(3):
+            try:
+                results = await asyncio.wait_for(asyncio.to_thread(run), timeout=20)
+                if results:
+                    break
+            except Exception as exc:
+                logger.warning("DuckDuckGo search attempt %s failed for %r: %s", attempt + 1, query, exc)
+                if attempt < 2:
+                    await asyncio.sleep(2 ** attempt)
         unique, seen = [], set()
         for result in results:
             if result["url"] and result["url"] not in seen:

@@ -33,7 +33,19 @@ async def create_research(payload: ResearchCreate):
 async def _run_research(project_id, payload, provider):
     try:
         events[project_id].append({"type": "agent", "agent": "Planner Agent", "status": "completed", "message": "Research plan created."})
-        results = await searcher.search(payload.topic, payload.max_sources)
+        queries = [
+            payload.topic,
+            f"{payload.topic} latest research",
+            f"{payload.topic} evidence sources",
+        ]
+        results, seen_urls = [], set()
+        per_query = max(1, payload.max_sources // len(queries))
+        for query in queries:
+            for item in await searcher.search(query, per_query):
+                if item.get("url") and item["url"] not in seen_urls:
+                    results.append(item)
+                    seen_urls.add(item["url"])
+        results = results[:payload.max_sources]
         events[project_id].append({"type": "agent", "agent": "Research Agent", "status": "completed", "message": f"Collected {len(results)} public sources."})
         evidence = "\n\n".join(f"SOURCE {i}: {item.get('title', '')}\nURL: {item.get('url', '')}\nSNIPPET: {item.get('content', '')}" for i, item in enumerate(results, 1))
         prompt = f"""You are the report writer for a research assistant.\nResearch question: {payload.topic}\nObjective: {payload.objective}\n\nUse only the source snippets below. Do not invent facts or citations. If evidence is insufficient, say so clearly. Cite sources inline as [1], [2], etc. Return a concise report with Executive summary, Key findings, Limitations, and References.\n\n{evidence or 'No search results were available. Explain that the question could not be verified.'}"""
