@@ -13,4 +13,21 @@ class GeminiProvider(LLMProvider):
         from langchain_google_genai import ChatGoogleGenerativeAI
         model = ChatGoogleGenerativeAI(model=self.settings.gemini_model, google_api_key=self.settings.google_api_key)
         result = await model.ainvoke(prompt)
-        return LLMResponse(text=str(result.content), provider=self.name)
+        content = result.content
+        if isinstance(content, str):
+            text = content
+        elif isinstance(content, list):
+            parts = []
+            for block in content:
+                if isinstance(block, dict):
+                    value = block.get("text")
+                    if value:
+                        parts.append(str(value))
+                else:
+                    value = getattr(block, "text", None)
+                    if value:
+                        parts.append(str(value))
+            text = "\n".join(parts) or str(content)
+        else:
+            text = str(content)
+        return LLMResponse(text=text, provider=self.name)
