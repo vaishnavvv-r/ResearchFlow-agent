@@ -20,3 +20,12 @@ class ResearchProject(BaseModel):
     provider: str
     created_at: datetime
     sources_count: int = 0
+
+
+class ResearchReport(BaseModel):
+    research_id: str
+    title: str
+    content: str
+    provider: str
+    mock: bool = False
+    sources: list[dict] = []
